@@ -1,0 +1,426 @@
+diff --git a/RANKER_EXPERIMENT.md b/RANKER_EXPERIMENT.md
+new file mode 100644
+--- /dev/null
++++ b/RANKER_EXPERIMENT.md
+@@ -0,0 +1,127 @@
++# CatBoost на кандидатах из benchmark
++
++Патч добавляет новый запуск и тесты. Старые исходники, результаты и gitignore не меняет.
++Он использует уже имеющиеся `tools/benchmark_candidates.py`, `explore_trends.py` и
++`explore_yambda.py`; автоматического скачивания данных нет.
++
++## Зачем сейчас
++
++На полном benchmark свежая популярность устойчиво выигрывает у исторической, а
++персональное объединение с артистами — у общих источников. На последнем срезе его
++Recall@100 по активным пользователям = 0.057742, при полноте того же пула 1000 = 0.192435.
++Полное объединение имеет полноту 0.293633 при среднем размере около 3042 кандидатов.
++Это повод сравнить ранжирование и два бюджета, а не считать все виды трендов одинаково
++полезными: относительный рост слаб самостоятельно, равновесный global RRF уступает
++лучшему одиночному источнику по полноте на всех четырёх срезах.
++
++## Применение
++
++Сохрани `yambda_ranker_v1.patch` в корень своего репозитория. Из активированного окружения:
++
++```bash
++cd "$HOME/yambda_contest" &&
++git apply --check yambda_ranker_v1.patch &&
++git apply yambda_ranker_v1.patch &&
++uv pip install -e . &&
++python -m unittest discover -s tests -p test_candidate_ranker.py
++```
++
++Это команды для выполнения пользователем. Ассистент не вносит изменения в репозиторий.
++Если git apply --check сообщает о конфликте, не применяй принудительно: пришли вывод.
++
++## Рекомендуемый запуск
++
++```bash
++cd "$HOME/yambda_contest" &&
++python tools/train_candidate_ranker.py \
++  --data data/5b \
++  --users input/test_users.csv \
++  --out eda_results/candidate_ranker_v1 \
++  --max-users 5000 \
++  --train-users 1500 \
++  --train-future-days 150 \
++  --val-future-days 90 \
++  --eval-future-days 60 30 \
++  --candidate-budgets 1000 3000 \
++  --iterations 100 200 400 \
++  --threads 4 \
++  --artist-catalog 200000 \
++  --min-support 10 \
++  --seed 42 \
++  --cache-dir data/eda_cache
++```
++
++Здесь 5000 — воспроизводимая подвыборка тестовых UID для первой проверки ранжировщика,
++а не все 26 021 пользователя. Обучение использует 1500 из них. Популяционные счётчики
++считаются по полным прошлым данным. Это ограничивает стоимость первого обучения;
++скорость полного файла и потребление памяти новым запуском пока не измерялись.
++
++Нужен запас RAM и диска: максимум около 4.5 млн обучающих пар и до 15 млн пар на каждый
++из трёх периодов оценки. Признаки записываются порциями в Parquet; обучение каждого
++бюджета загружает его обучающую матрицу. Инференс читает порциями. Это не гарантия
++фиксированного максимума памяти — CatBoost также строит внутренние представления.
++На каждый бюджет модель учится один раз до 400 деревьев; варианты 100/200/400 проверяются
++по префиксам одной модели, без трёх независимых обучений.
++
++## Временные границы
++
++- История каждого снимка: строго раньше его cutoff.
++- Train: срез за 150 дней до конца, метки только до validation за 90 дней до конца.
++- Validation: срез за 90 дней, метки только до первого периода проверки за 60 дней.
++- Проверки разработки: срезы за 60 и 30 дней, метки до наблюдаемого конца журнала.
++- Число деревьев и бюджет выбираются на validation; поздние периоды не переопределяют
++  выбранную модель. Для диагностического сравнения каждый бюджет использует собственное
++  лучшее число деревьев с validation.
++
++Цель согласована с последним EDA: первые 100 событий лайка, сравнение уникальных item_ids;
++старые лайки не исключаются навсегда. Метки train/validation обрезаются на границе следующего
++периода, чтобы не использовать будущее при обучении/выборе модели. Это оставляет неполные
++цели и смещение по длине наблюдения; проблема не объявляется решённой. Отдельно выводятся
++оценки all/active/full100. Active — пользователи с хотя бы одной наблюдаемой целью;
++full100 — с полными 100 событиями, они могут иметь меньше 100 различных треков.
++
++Уже изученные периоды являются разработкой, не независимым финальным тестом.
++Абсолютные метрики новой 5000-user выборки нельзя напрямую сравнивать с полным benchmark.
++Сравнивай CatBoost и RRF внутри этого запуска на одной группе и одинаковом наборе кандидатов.
++
++## Кандидаты и признаки
++
++Сохраняются восемь общих источников и два источника артистов из benchmark. Полные их
++объединения ранжируются по двум семействам RRF; только потом применяется лимит 3000.
++Для бюджета 1000 берётся префикс того же порядка. В отличие от старого `rrf_personal`,
++семейства здесь не обрезаются до 1000 перед финальным объединением: это позволяет проверить
++более крупный пул. Поэтому прежнее число Recall не считается точным воспроизведённым
++базовым результатом; RRF пересчитывается на тех же кандидатах внутри нового опыта.
++
++В CatBoost подаются 32 скалярных признака:
++
++- логарифмы популярности и затухающих счётчиков на разных масштабах;
++- относительный/абсолютный рост и число недавних пользователей;
++- время с первого наблюдаемого лайка (не дата релиза);
++- активность и свежесть истории пользователя;
++- был ли уже лайк этого трека, сколько раз и как давно;
++- позиции в каждом общем/артистном источнике и в объединениях, число источников.
++
++UID/item_id не являются признаками. Позитивы не добавляются в кандидаты по знанию ответа.
++Негативы берутся из того же кандидатного распределения. Наблюдаемые пользователи без
++меток пропускаются при обучении как неопределённые; их нулевые оценки сохраняются в
++all-метрике. Пользователи с метками, не попавшими в кандидаты, не удаляются как «трудные».
++Вес строки — 1 / число различных целевых треков пользователя; это приближение к
++макроусреднению, не точная оптимизация Recall. Выбор делается по самому Recall@100.
++
++## Выходные файлы
++
++- `report.html`, `summary.json`, таблицы и графики — результаты для разбора;
++- `eda_for_review.zip` — компактный архив для передачи;
++- `model_<budget>.cbm`, `selected_model.cbm` — модели;
++- `pairs/*.parquet` — сохранённые признаки/метки для анализа и дальнейших запусков;
++- `pairs/*.json` — метаданные, цели и базовые показатели каждого снимка.
++
++Архив для передачи не включает модели и большие таблицы пар. Существующий gitignore
++исключает Parquet/CBM, но разрешает JSON/HTML/CSV/SVG. Метаданные с целями не содержат
++признаков скрытого теста — только открытые временные окна для разработки.
++
++Четыре автоматических теста используют синтетические данные: метрика, строгие временные
++границы и неизменность признаков при добавлении будущих событий, весь цикл обучения/выбора,
++а также корректное объединение top-100 пользователя, разбитого между пакетами Arrow.
++Качество на Yambda этот тест не устанавливает.
+diff --git a/tests/test_candidate_ranker.py b/tests/test_candidate_ranker.py
+new file mode 100644
+--- /dev/null
++++ b/tests/test_candidate_ranker.py
+@@ -0,0 +1,73 @@
++import json
++from pathlib import Path
++import subprocess
++import sys
++import tempfile
++import unittest
++from unittest.mock import patch
++import numpy as np
++import polars as pl
++
++ROOT=Path(__file__).resolve().parents[1]
++sys.path.insert(0,str(ROOT/'tools'))
++import train_candidate_ranker as ranker
++import explore_trends as core
++
++
++class RankerTests(unittest.TestCase):
++    def fixture(self,root):
++        data=root/'data';data.mkdir();rng=np.random.default_rng(11);rows=[]
++        for u in range(20):
++            for j in range(180):rows.append((u,int((u%4)*80+rng.integers(0,80)),j*2*core.DAY+u*5))
++        pl.DataFrame(rows,schema=['uid','item_id','timestamp'],orient='row').with_columns(pl.all().cast(pl.UInt32)).write_parquet(data/'likes.parquet')
++        pl.DataFrame({'item_id':range(320),'artist_id':[i//20 for i in range(320)]}).write_parquet(data/'artist_item_mapping.parquet')
++        users=root/'users.csv';pl.DataFrame({'uid':list(range(12))+[999]}).write_csv(users)
++        return data,users
++
++    def test_future_invariance_and_label_boundary(self):
++        with tempfile.TemporaryDirectory() as d:
++            root=Path(d);data,users=self.fixture(root);cut=150*core.DAY
++            ctx=core.load_context(data,users);before=list(ranker.source_features(ctx,cut,[0,999],150,None,200,2))
++            old=pl.read_parquet(data/'likes.parquet')
++            extra=pl.DataFrame({'uid':[0]*30,'item_id':[9999]*30,'timestamp':[cut+1]*30}).cast(old.schema)
++            pl.concat([old,extra]).write_parquet(data/'likes.parquet')
++            after=list(ranker.source_features(core.load_context(data,users),cut,[0,999],150,None,200,2))
++            for a,b in zip(before,after):
++                self.assertEqual(a[0],b[0]);np.testing.assert_array_equal(a[1],b[1]);np.testing.assert_array_equal(a[2],b[2])
++            meta=ranker.build_pairs(ctx,cut,cut+10*core.DAY,[0,999],root/'pairs.parquet',150,None,200,2)
++            expected=set(ctx.likes.filter((pl.col('uid')==0)&(pl.col('timestamp')>=cut)&(pl.col('timestamp')<cut+10*core.DAY))['item_id'].to_list())
++            self.assertEqual(set(meta['truth'][0]),expected)
++            table=pl.read_parquet(root/'pairs.parquet')
++            self.assertEqual(table.select(ranker.FEATURES).width,len(ranker.FEATURES))
++            self.assertTrue(all(i in expected for i in table.filter((pl.col('uid')==0)&(pl.col('target')==1))['item_id']))
++
++    def test_full_training_selection_and_batched_inference(self):
++        with tempfile.TemporaryDirectory() as d:
++            root=Path(d);data,users=self.fixture(root)
++            args=['train_candidate_ranker.py','--data',str(data),'--users',str(users),'--out',str(root/'run'),
++                  '--max-users','0','--train-users','8','--train-future-days','240','--val-future-days','180',
++                  '--eval-future-days','120','60','--candidate-budgets','100','150','--iterations','3','5',
++                  '--artist-catalog','200','--min-support','2','--threads','2','--cache-dir',str(root/'cache')]
++            with patch.object(sys,'argv',args):ranker.main()
++            report=json.loads((root/'run/summary.json').read_text())
++            self.assertEqual(len(report['development']),8)
++            self.assertEqual(report['selected_on_validation']['n_users'],13)
++            self.assertTrue((root/'run/selected_model.cbm').exists())
++            self.assertTrue((root/'run/eda_for_review.zip').exists())
++            for row in report['development']:self.assertTrue(0<=row['recall_active']<=1)
++            with patch.object(sys,'argv',args),self.assertRaises(SystemExit):ranker.main()
++
++    def test_inference_merges_a_user_split_across_arrow_batches(self):
++        with tempfile.TemporaryDirectory() as d:
++            path=Path(d)/'split.parquet';n0=65500;n1=1000
++            pl.DataFrame({'uid':[0]*n0+[1]*n1,'item_id':list(range(n0))+list(range(n1)),
++                          'candidate_rank':list(range(1,n0+1))+list(range(1,n1+1))}).write_parquet(path)
++            predictions=ranker.predict_file(None,path,100000,0,baseline=True)
++            self.assertEqual(predictions[1],list(range(100)))
++
++    def test_metric_uses_distinct_items_and_keeps_zero_users(self):
++        result=ranker.metric({1:[7,8],2:[3]},{1:[7,7,9]},[1,2],{1})
++        self.assertEqual(result['recall_all'],.25);self.assertEqual(result['recall_active'],.5)
++
++
++if __name__=='__main__':unittest.main()
+diff --git a/tools/train_candidate_ranker.py b/tools/train_candidate_ranker.py
+new file mode 100644
+--- /dev/null
++++ b/tools/train_candidate_ranker.py
+@@ -0,0 +1,211 @@
++#!/usr/bin/env python3
++"""Chronological CatBoost on the benchmark's candidate sources; no contest export."""
++from __future__ import annotations
++import argparse
++import gc
++import json
++from pathlib import Path
++import time
++import numpy as np
++import polars as pl
++import pyarrow as pa
++import pyarrow.parquet as pq
++import matplotlib.pyplot as plt
++from catboost import CatBoostClassifier
++import benchmark_candidates as bench
++import explore_trends as core
++import explore_yambda as base
++
++CHANNELS=core.SOURCES+['artist_pop','artist_trend']
++STAT_COLS=['pop_all','pop30','pop7','pop2','prev7','decay7','decay30','recent_users','ratio7','growth7','momentum7','first_seen_ts']
++FEATURES=['log_'+c for c in STAT_COLS[:8]]+['ratio7','growth7','momentum7','first_seen_age_days']+[
++    'log_user_likes','user_recent30_fraction','user_recency_days','seen_like','seen_recency_days','log_seen_count']+[
++    s+'_rr' for s in CHANNELS]+['global_rr','artist_rr','fusion_rr','n_sources']
++
++
++def metric(predictions,truth,users,complete):
++    active=[];full=[];all_scores=[]
++    for u in users:
++        t=set(truth.get(u,[]));score=len(t&set(predictions.get(u,[])[:100]))/len(t) if t else 0.
++        all_scores.append(score)
++        if t:active.append(score)
++        if u in complete:full.append(score)
++    return {'recall_all':float(np.mean(all_scores)) if all_scores else None,
++            'recall_active':float(np.mean(active)) if active else None,
++            'recall_full100':float(np.mean(full)) if full else None,
++            'n_users':len(users),'n_active':len(active),'n_full100':len(full)}
++
++
++def source_features(ctx,cut,users,budget,cache_dir,artist_catalog,min_support):
++    history=ctx.likes.filter((pl.col('timestamp')<cut)&pl.col('uid').is_in(users))
++    stats,signature=bench.cached_stats(ctx.data,cut,cache_dir)
++    lists=bench.global_lists(stats,1000,min_support)
++    global_union=set(i for values in lists.values() for i in values)
++    global_order=core.fuse(list(lists.values()),len(global_union))
++    global_ranks={int(i):r for r,i in enumerate(global_order,1)}
++    global_maps={k:{int(i):r for r,i in enumerate(v,1)} for k,v in lists.items()}
++    artists=bench.ArtistSource(ctx.data,history,stats,cut,artist_catalog)
++    index={int(i):j for j,i in enumerate(stats['item_id'])}
++    stat_values=stats.select(STAT_COLS).to_numpy().astype(np.float32)
++    histories={int(u):g for (u,),g in history.group_by('uid')}
++    del stats;gc.collect()
++    for u in users:
++        personal=artists.recommend(u,1000)
++        artist_union=set(i for values in personal.values() for i in values)
++        artist_order=core.fuse(list(personal.values()),len(artist_union))
++        # Hierarchical RRF over the complete source union, capped only at the final budget.
++        fused=core.fuse([global_order,artist_order],budget)
++        if len(fused)<100:raise ValueError(f'Only {len(fused)} candidates for uid={u}; insufficient historical catalog')
++        ids=np.asarray(fused,dtype=np.int64);rows=np.asarray([index[int(i)] for i in ids]);v=stat_values[rows].copy()
++        v[:,:8]=np.log1p(v[:,:8]);v[:,11]=(cut-v[:,11])/core.DAY
++        h=histories.get(u);n=h.height if h is not None else 0
++        recent=float((h['timestamp']>=cut-30*core.DAY).mean()) if n else 0.
++        recency=(cut-int(h['timestamp'].max()))/core.DAY if n else -1.
++        seen={int(i):(int(c),int(t)) for i,c,t in h.group_by('item_id').agg(pl.len(),pl.col('timestamp').max()).iter_rows()} if n else {}
++        user=np.empty((len(ids),6),np.float32)
++        user[:,0]=np.log1p(n);user[:,1]=recent;user[:,2]=recency
++        user[:,3]=[float(int(i) in seen) for i in ids]
++        user[:,4]=[(cut-seen[int(i)][1])/core.DAY if int(i) in seen else -1. for i in ids]
++        user[:,5]=[np.log1p(seen.get(int(i),(0,0))[0]) for i in ids]
++        maps={**global_maps,**{k:{int(i):r for r,i in enumerate(values,1)} for k,values in personal.items()}}
++        channels=np.asarray([[1/maps[k][int(i)] if int(i) in maps[k] else 0. for k in CHANNELS] for i in ids],np.float32)
++        ar={int(i):r for r,i in enumerate(artist_order,1)}
++        rr=np.asarray([[1/global_ranks[int(i)] if int(i) in global_ranks else 0.,
++                        1/ar[int(i)] if int(i) in ar else 0.,1/(r+1),float(np.count_nonzero(channels[r]))]
++                       for r,i in enumerate(ids)],np.float32)
++        x=np.concatenate([v,user,channels,rr],axis=1)
++        if not np.isfinite(x).all():raise ValueError('Non-finite features')
++        yield u,ids,x
++
++
++def build_pairs(ctx,cut,label_end,users,out,budget,cache_dir,artist_catalog,min_support):
++    """Candidates/features accept past only; labels are attached afterwards."""
++    target=ctx.likes.filter(pl.col('uid').is_in(users)&(pl.col('timestamp')>=cut)&(pl.col('timestamp')<label_end))
++    target=target.group_by('uid',maintain_order=True).head(100)
++    truth=base.user_lists(target)
++    complete=set(target.group_by('uid').len().filter(pl.col('len')==100)['uid'].to_list())
++    path=Path(out);path.parent.mkdir(parents=True,exist_ok=True)
++    writer=None;baseline={};coverage=[];count=0;started=time.perf_counter();chunk=[]
++    def write_chunk(parts,writer):
++        table=pa.concat_tables(parts)
++        if writer is None:writer=pq.ParquetWriter(path,table.schema,compression='zstd')
++        writer.write_table(table);return writer
++    try:
++        for u,ids,x in source_features(ctx,cut,users,budget,cache_dir,artist_catalog,min_support):
++            true=set(truth.get(u,[]));y=np.array([int(int(i) in true) for i in ids],np.int8)
++            columns={name:pa.array(x[:,j]) for j,name in enumerate(FEATURES)}
++            columns.update(uid=pa.array(np.full(len(ids),u,np.int64)),item_id=pa.array(ids),
++                candidate_rank=pa.array(np.arange(1,len(ids)+1,dtype=np.int32)),target=pa.array(y),
++                n_true=pa.array(np.full(len(ids),len(true),np.int16)))
++            chunk.append(pa.table(columns));count+=len(ids);baseline[u]=ids[:100].tolist()
++            if true:coverage.append(float(y.sum()/len(true)))
++            if len(chunk)>=16:writer=write_chunk(chunk,writer);chunk=[]
++        if chunk:writer=write_chunk(chunk,writer)
++    finally:
++        if writer is not None:writer.close()
++    result={'cutoff':cut,'label_end_exclusive':label_end,'users':users,'truth':truth,'complete':sorted(complete),
++            'candidate_pairs':count,'candidate_recall_active':float(np.mean(coverage)) if coverage else None,
++            'rrf':metric(baseline,truth,users,complete),'seconds':time.perf_counter()-started}
++    path.with_suffix('.json').write_text(json.dumps(result,ensure_ascii=False))
++    print(f'PAIRS cutoff={cut}: rows={count:,}, candidate recall={result["candidate_recall_active"]}',flush=True)
++    return result
++
++
++def predict_file(model,path,cap,trees,features=FEATURES,baseline=False):
++    """Bounded inference; row groups may split users, so merge their local top-100 lists."""
++    best={}
++    for batch in pq.ParquetFile(path).iter_batches(batch_size=65536):
++        frame=pl.from_arrow(batch).filter(pl.col('candidate_rank')<=cap)
++        if not frame.height:continue
++        score=-frame['candidate_rank'].to_numpy().astype(float) if baseline else model.predict_proba(frame.select(features).to_numpy(),ntree_end=trees)[:,1]
++        top=frame.select('uid','item_id').with_columns(pl.Series('score',score)).sort(['uid','score','item_id'],descending=[False,True,False]).group_by('uid',maintain_order=True).head(100)
++        for (u,),g in top.group_by('uid'):
++            values=best.get(int(u),[])+g.select('item_id','score').rows()
++            best[int(u)]=sorted(values,key=lambda p:(-p[1],p[0]))[:100]
++    return {u:[int(i) for i,s in values] for u,values in best.items()}
++
++
++def evaluate_file(model,path,meta,cap,trees,baseline=False,return_predictions=False):
++    truth={int(k):v for k,v in meta['truth'].items()}
++    predictions=predict_file(model,path,cap,trees,baseline=baseline)
++    result=metric(predictions,truth,meta['users'],set(meta['complete']))
++    return (result,predictions) if return_predictions else result
++
++
++def main():
++    p=argparse.ArgumentParser(description=__doc__)
++    p.add_argument('--data',required=True);p.add_argument('--users',default='input/test_users.csv');p.add_argument('--out',required=True)
++    p.add_argument('--max-users',type=int,default=5000);p.add_argument('--train-users',type=int,default=1500)
++    p.add_argument('--train-future-days',type=int,default=150);p.add_argument('--val-future-days',type=int,default=90)
++    p.add_argument('--eval-future-days',type=int,nargs='+',default=[60,30]);p.add_argument('--candidate-budgets',type=int,nargs='+',default=[1000,3000])
++    p.add_argument('--iterations',type=int,nargs='+',default=[100,200,400]);p.add_argument('--threads',type=int,default=4)
++    p.add_argument('--artist-catalog',type=int,default=200000);p.add_argument('--min-support',type=int,default=10)
++    p.add_argument('--seed',type=int,default=42);p.add_argument('--cache-dir',default='data/eda_cache')
++    a=p.parse_args();out=Path(a.out)
++    if out.exists() and any(out.iterdir()):p.error('Choose a new empty --out')
++    if not a.train_future_days>a.val_future_days>max(a.eval_future_days)>0:p.error('Require train > val > every evaluation future-days >0')
++    if min(a.iterations)<1 or min(a.candidate_budgets)<100 or a.train_users<1:p.error('Invalid training/candidate budget')
++    ctx=core.load_context(a.data,a.users,a.max_users,a.seed);out.mkdir(parents=True,exist_ok=True)
++    train_cut=ctx.end-a.train_future_days*core.DAY;val_cut=ctx.end-a.val_future_days*core.DAY
++    eval_cuts=sorted(set(ctx.end-d*core.DAY for d in a.eval_future_days))
++    if train_cut<=ctx.start:p.error('Training cutoff precedes available history')
++    val_label_end=min(eval_cuts)
++    train_users=sorted(np.random.default_rng(a.seed+1).choice(ctx.users,min(a.train_users,len(ctx.users)),replace=False).tolist())
++    capacity=max(a.candidate_budgets);snapshots={}
++    schedule=[('train',train_cut,val_cut,train_users),('validation',val_cut,val_label_end,ctx.users)]
++    schedule += [(f'development_{int((ctx.end-cut)/core.DAY)}d',cut,ctx.end,ctx.users) for cut in eval_cuts]
++    for name,cut,end,users in schedule:
++        print(f'BUILD {name}: history < {cut}, labels [{cut}, {end}), users={len(users)}',flush=True)
++        snapshots[name]=build_pairs(ctx,cut,end,users,out/'pairs'/f'{name}.parquet',capacity,a.cache_dir,a.artist_catalog,a.min_support)
++    # No oracle insertion: every positive must first be retrieved by the historical sources.
++    validation=[];models={};chosen=None
++    for cap in sorted(set(a.candidate_budgets)):
++        print(f'TRAIN CatBoost, candidate budget={cap}',flush=True)
++        frame=base.collect(pl.scan_parquet(out/'pairs/train.parquet').filter((pl.col('candidate_rank')<=cap)&(pl.col('n_true')>0)))
++        if frame['target'].n_unique()!=2:raise ValueError('Need positive and negative retrieved training examples')
++        x=frame.select(FEATURES).to_numpy();y=frame['target'].to_numpy();weights=1/frame['n_true'].to_numpy().clip(1,100)
++        model=CatBoostClassifier(iterations=max(a.iterations),depth=6,learning_rate=.05,l2_leaf_reg=10,
++            loss_function='Logloss',thread_count=a.threads,random_seed=a.seed,allow_writing_files=False,verbose=100)
++        model.fit(x,y,sample_weight=weights);del frame,x,y,weights;gc.collect()
++        model.save_model(str(out/f'model_{cap}.cbm'));models[cap]=model
++        for trees in sorted(set(a.iterations)):
++            row={'budget':cap,'iterations':trees,**evaluate_file(model,out/'pairs/validation.parquet',snapshots['validation'],cap,trees)}
++            validation.append(row);print('VALIDATION',row,flush=True)
++            if row['n_active']==0:raise ValueError('Validation has no observed future likes')
++            if chosen is None or row['recall_active']>chosen['recall_active']:chosen=row
++    selected=models[chosen['budget']].copy();selected.shrink(chosen['iterations']);selected.save_model(str(out/'selected_model.cbm'))
++    report=base.Report(out);rows=[];paired=[]
++    per_budget_best={cap:max((v for v in validation if v['budget']==cap),key=lambda v:v['recall_active']) for cap in models}
++    for name,cut,end,users in schedule:
++        if name in ['train','validation']:continue
++        meta=snapshots[name];path=out/'pairs'/f'{name}.parquet'
++        for cap,model in models.items():
++            trees=per_budget_best[cap]['iterations']
++            baseline,bp=evaluate_file(None,path,meta,cap,0,baseline=True,return_predictions=True)
++            result,mp=evaluate_file(model,path,meta,cap,trees,return_predictions=True)
++            truth={int(k):set(v) for k,v in meta['truth'].items()}
++            delta=np.asarray([(len(set(mp.get(u,[]))&truth[u])-len(set(bp.get(u,[]))&truth[u]))/len(truth[u]) for u in meta['users'] if truth.get(u)])
++            paired.append({'period':name,'budget':cap,**core.paired_interval(delta,a.seed,repeats=500)})
++            # Each budget uses its own best tree count selected only on validation.
++            rows.append({'period':name,'budget':cap,'method':'RRF',**baseline})
++            rows.append({'period':name,'budget':cap,'method':'CatBoost','iterations':trees,'selected_budget':cap==chosen['budget'],**result})
++    report.table('development_metrics',pl.DataFrame(rows),'CatBoost и RRF на одинаковых кандидатах',
++        'Параметры выбраны только на validation. Остальные периоды — проверка разработки, не незатронутый финальный тест. '
++        'Цели train/validation ограничены следующим временным срезом: это предотвращает использование будущих меток, но оставляет цензурирование.')
++    report.table('paired_improvement',pl.DataFrame(paired),'CatBoost минус RRF: парная разница по активным пользователям','Интервал отражает выборку пользователей, но не будущий временной сдвиг или множественный подбор.')
++    report.table('validation_selection',pl.DataFrame(validation),'Выбор числа деревьев и бюджета','Максимизируем реальный Recall@100 на validation, не AUC. Не выбираем модель заново по поздним периодам.')
++    imp=selected.get_feature_importance()
++    report.table('feature_importance',pl.DataFrame({'feature':FEATURES,'importance':imp}).sort('importance',descending=True),'Важность признаков','Важность среди коррелирующих признаков не является причинным эффектом.')
++    for period in sorted(set(r['period'] for r in rows)):
++        data=[r for r in rows if r['period']==period];fig,ax=plt.subplots(figsize=(9,4))
++        ax.barh([f'{r["method"]}, {r["budget"]}' for r in data],[100*r['recall_active'] for r in data]);ax.invert_yaxis();ax.set_xlabel('Recall@100, активные пользователи (%)')
++        report.figure(period,fig,f'Ранжирование: {period}')
++    result={'arguments':vars(a),'features':FEATURES,'selected_on_validation':chosen,'validation':validation,'development':rows,'paired_improvement':paired,
++            'snapshots':{k:{kk:vv for kk,vv in v.items() if kk not in ['truth','complete','users']} for k,v in snapshots.items()},
++            'user_file_sha256':ctx.user_sha256,'evaluation_users':len(ctx.users),'train_users':len(train_users),
++            'target':'next 100 chronological like events; unique set metric; repeated old items allowed',
++            'development_is_not_final_audit':True}
++    report.summary=result;report.finish()
++
++
++if __name__=='__main__':main()
