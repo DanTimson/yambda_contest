@@ -1,0 +1,15 @@
+{
+  "python": "3.12.14",
+  "platform": "Linux-6.18.55-x86_64-with-glibc2.39",
+  "packages": {
+    "numpy": "2.3.5",
+    "polars": "1.44.2",
+    "pyarrow": "26.0.0",
+    "scipy": "1.17.0",
+    "scikit-learn": "1.8.0",
+    "catboost": "1.2.10",
+    "huggingface-hub": "2.3.0",
+    "implicit": "0.7.3",
+    "pytest": "9.1.1"
+  }
+}

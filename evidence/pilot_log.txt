@@ -1,0 +1,138 @@
+BUILD train cutoff=13000000, label_end=17000000.0
+BUILD validation cutoff=17000000
+VALIDATION {'iterations': 50, 'recall_all': 0.060094430196682855, 'recall_active': 0.07574928176052463, 'recall_full100': 0.04363636363636364, 'n_users': 150, 'n_active': 119, 'n_full100': 11, 'n_zero_future': 31}
+VALIDATION {'iterations': 100, 'recall_all': 0.06079557193992986, 'recall_active': 0.07663307387386117, 'recall_full100': 0.045454545454545456, 'n_users': 150, 'n_active': 119, 'n_full100': 11, 'n_zero_future': 31}
+BUILD audit test (configuration is frozen)
+{
+  "catboost": {
+    "recall_all": 0.06275330557635685,
+    "recall_active": 0.06317446870103037,
+    "recall_full100": 0.05789473684210527,
+    "n_users": 150,
+    "n_active": 149,
+    "n_full100": 19,
+    "n_zero_future": 1
+  },
+  "rrf": {
+    "recall_all": 0.05578149474665036,
+    "recall_active": 0.05615586719461447,
+    "recall_full100": 0.04684210526315789,
+    "n_users": 150,
+    "n_active": 149,
+    "n_full100": 19,
+    "n_zero_future": 1
+  },
+  "popular": {
+    "recall_all": 0.0345326157680509,
+    "recall_active": 0.03476437828998414,
+    "recall_full100": 0.04631578947368422,
+    "n_users": 150,
+    "n_active": 149,
+    "n_full100": 19,
+    "n_zero_future": 1
+  },
+  "recent": {
+    "recall_all": 0.047616274183549405,
+    "recall_active": 0.047935846493506115,
+    "recall_full100": 0.04421052631578948,
+    "n_users": 150,
+    "n_active": 149,
+    "n_full100": 19,
+    "n_zero_future": 1
+  },
+  "candidates": {
+    "candidate_relevant_fraction_active": 0.11733127318554315,
+    "oracle_recall100_active": 0.11733127318554315,
+    "candidate_pairs": 57924
+  },
+  "catboost_minus_rrf": {
+    "delta_active": 0.0070186015064159155,
+    "ci95": [
+      0.0017611470399541166,
+      0.01233426987607561
+    ],
+    "n": 149
+  },
+  "sources": {
+    "pop": {
+      "candidate_relevant_fraction_active": 0.03476437828998414,
+      "oracle_recall100_active": 0.03476437828998414,
+      "candidate_pairs": 15000
+    },
+    "recent": {
+      "candidate_relevant_fraction_active": 0.047935846493506115,
+      "oracle_recall100_active": 0.047935846493506115,
+      "candidate_pairs": 15000
+    },
+    "trend": {
+      "candidate_relevant_fraction_active": 0.01438746490573394,
+      "oracle_recall100_active": 0.01438746490573394,
+      "candidate_pairs": 15000
+    },
+    "artist": {
+      "candidate_relevant_fraction_active": 0.03272265677470541,
+      "oracle_recall100_active": 0.03272265677470541,
+      "candidate_pairs": 12023
+    },
+    "knn": {
+      "candidate_relevant_fraction_active": 0.03924644657831905,
+      "oracle_recall100_active": 0.03924644657831905,
+      "candidate_pairs": 12055
+    },
+    "listened": {
+      "candidate_relevant_fraction_active": 0.0,
+      "oracle_recall100_active": 0.0,
+      "candidate_pairs": 0
+    }
+  },
+  "source_leave_one_out": {
+    "pop": {
+      "candidate_relevant_fraction_active": 0.10737711800584662,
+      "oracle_recall100_active": 0.10737711800584662,
+      "candidate_pairs": 49672
+    },
+    "recent": {
+      "candidate_relevant_fraction_active": 0.10156221298615405,
+      "oracle_recall100_active": 0.10156221298615405,
+      "candidate_pairs": 51270
+    },
+    "trend": {
+      "candidate_relevant_fraction_active": 0.11130021518596661,
+      "oracle_recall100_active": 0.11130021518596661,
+      "candidate_pairs": 45048
+    },
+    "artist": {
+      "candidate_relevant_fraction_active": 0.09146230274936731,
+      "oracle_recall100_active": 0.09146230274936731,
+      "candidate_pairs": 46976
+    },
+    "knn": {
+      "candidate_relevant_fraction_active": 0.09672739842086768,
+      "oracle_recall100_active": 0.09672739842086768,
+      "candidate_pairs": 48767
+    },
+    "listened": {
+      "candidate_relevant_fraction_active": 0.11733127318554315,
+      "oracle_recall100_active": 0.11733127318554315,
+      "candidate_pairs": 57924
+    }
+  },
+  "warm": {
+    "recall_all": 0.06121521223038351,
+    "recall_active": 0.061697221775504636,
+    "recall_full100": 0.04916666666666667,
+    "n_users": 128,
+    "n_active": 127,
+    "n_full100": 12,
+    "n_zero_future": 1
+  },
+  "cold": {
+    "recall_all": 0.07170221231656536,
+    "recall_active": 0.07170221231656536,
+    "recall_full100": 0.07285714285714286,
+    "n_users": 22,
+    "n_active": 22,
+    "n_full100": 7,
+    "n_zero_future": 0
+  }
+}

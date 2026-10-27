@@ -1,0 +1,9 @@
+{
+  "repo": "yandex/yambda",
+  "revision": "dd6f3a19eef5866e346c3270e098baa641a44948",
+  "size": "50m",
+  "files": {
+    "likes": "flat/50m/likes.parquet",
+    "artist_item_mapping": "artist_item_mapping.parquet"
+  }
+}

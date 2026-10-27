@@ -1,0 +1,4 @@
+numpy>=1.26,<3
+polars>=1.30,<2
+pyarrow>=17
+matplotlib>=3.8,<4

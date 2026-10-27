@@ -1,0 +1,106 @@
+# Python environments, build products and caches
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.pyre/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+build/
+dist/
+
+# Credentials and local machine configuration
+.env
+.env.*
+!.env.example
+!.env.template
+*.pem
+*.key
+.netrc
+.pypirc
+
+# Downloaded data and Hugging Face caches (also ignore directory symlinks)
+/data
+/datasets
+/downloads
+/raw
+/cache
+/.cache
+/hf_cache
+/huggingface
+/models
+/checkpoints
+wandb/
+mlruns/
+catboost_info/
+
+# Large dataset, vector, model and archive files regardless of location
+*.parquet
+*.arrow
+*.feather
+*.h5
+*.hdf5
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.joblib
+*.cbm
+*.bin
+*.safetensors
+*.pt
+*.pth
+*.onnx
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+*.7z
+*.rar
+*.zst
+*.part
+*.incomplete
+
+# Generated model experiments, predictions and contest exports
+/artifacts
+/runs
+/outputs
+/submissions
+/predictions
+/results
+/logs
+*.log
+submission*.csv
+**/submission*.csv
+
+# Keep the small supplied user list; ignore other CSVs in the input directory.
+# Analysis CSV/JSON/HTML/SVG outside these paths remain trackable on purpose.
+/input/*
+!/input/test_users.csv
+!/input/README.md
+!/input/.gitkeep
+/upload
+
+# Jupyter checkpoints and editor/OS files; notebooks themselves remain trackable
+.ipynb_checkpoints/
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# EDA creates a compact review directory under eda_results/ which SHOULD be tracked.
+# Ignore only its packaged duplicate; the rule above already ignores all ZIP archives.
+# Avoid blanket *.csv / *.json / *.html / *.svg rules: those would hide the EDA evidence.

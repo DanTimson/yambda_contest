@@ -1,0 +1,14 @@
+measure,value
+events,89334605
+min_ts,0
+max_ts,26000000
+item_id_nulls,0
+timestamp_nulls,0
+uid_nulls,0
+organic_share,0.5769883798109366
+users_with_likes,827246
+liked_items,2011071
+span_days,300.9259259259259
+requested_users,26021
+requested_users_with_likes,25854
+requested_user_coverage,0.9935821067599246

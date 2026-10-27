@@ -1,0 +1,3 @@
+file,size_MiB,rows,row_groups,columns
+artist_item_mapping.parquet,36.5015230178833,9271906,35,"artist_id: uint32, item_id: uint32"
+likes.parquet,732.0944890975952,89334605,341,"uid: uint32, timestamp: uint32, item_id: uint32, is_organic: uint8"

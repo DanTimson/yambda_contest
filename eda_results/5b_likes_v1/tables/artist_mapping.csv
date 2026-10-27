@@ -1,0 +1,5 @@
+measure,value
+cohort_liked_items,525964
+mapped_items,525964
+mapping_coverage,1.0
+artists_per_mapped_item,"{'n': 525964, '0': 1.0, '0.1': 1.0, '0.25': 1.0, '0.5': 1.0, '0.75': 1.0, '0.9': 1.0, '0.95': 1.0, '0.99': 1.0, '1': 2.0}"

@@ -1,0 +1,4 @@
+cutoff,variant,future_observation_days,users,active_future_users,users_with_full100,full100_fraction_all,median_observed_targets_active,target_pair_seen_in_user_history_fraction,target_pair_globally_known_item_fraction,median_days_to100_complete_only,familiar_artist_target_pair_fraction_all,familiar_artist_target_pair_fraction_mapped
+20816001,next100_events,60.0,26021,25537,4902,0.18838630337035472,38.0,0.016797982206016224,0.8833609199185892,38.81905671296296,0.2687940151673902,0.2687940151673902
+20816001,next100_unique,60.0,26021,25537,4733,0.18189154913339226,37.0,0.01694397017537801,0.8833430058953493,38.758784722222224,,
+20816001,next100_new_items,60.0,26021,25532,4611,0.17720302832327736,36.0,0.0,0.8812621260083733,38.819895833333334,,

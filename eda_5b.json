@@ -1,0 +1,17 @@
+{
+  "events": 89334605,
+  "users": 827246,
+  "items": 2011071,
+  "min_ts": 0,
+  "max_ts": 26000000,
+  "test_users": 26021,
+  "test_with_likes": 25854,
+  "test_without_likes": 167,
+  "span_days": 300.9259259259259,
+  "likes_per_user_quantiles": {
+    "0.1": 2.0,
+    "0.5": 45.0,
+    "0.9": 269.0,
+    "0.99": 888.0
+  }
+}
