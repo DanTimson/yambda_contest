@@ -1,0 +1,7 @@
+comparison,cohort,users,delta,low95,high95
+"listen_no_sample_trends minus base_features, development",active,4793,0.02844695871535806,0.02506053841901528,0.03187904456142119
+"listen_no_sample_trends minus base_features, development",full100,390,0.013920178785882429,0.01120621938576812,0.017419622690380908
+"listen_features minus listen_no_sample_trends, development",active,4793,0.0005330604986031997,-0.0005775109824649193,0.0015807021445623448
+"listen_features minus listen_no_sample_trends, development",full100,390,-9.735760745021888e-6,-0.000774130061087806,0.0006876758682591211
+"listen_features minus base_features, development",active,4793,0.02898001921396126,0.025685018816956416,0.03198527912172722
+"listen_features minus base_features, development",full100,390,0.013910443025137408,0.010877747212995573,0.017387334079295262
