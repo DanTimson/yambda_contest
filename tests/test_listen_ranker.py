@@ -77,6 +77,8 @@ class ListenRankerTests(unittest.TestCase):
             self.assertTrue((root/'run/selected_model.cbm').exists());self.assertTrue((root/'run/eda_for_review.zip').exists())
             self.assertEqual(len(s['features']['listen_features']),len(app.FEATURES))
             self.assertEqual(s['snapshots']['train']['label_end_exclusive'],cuts[1])
+            with patch.object(sys,'argv',args+['--resume']), patch.object(app,'source_rows',side_effect=AssertionError('must reuse pairs')), patch.object(app.CatBoostRanker,'fit',side_effect=AssertionError('must reuse models')):
+                app.main()
             for r in s['metrics']:self.assertTrue(0<=r['recall_active']<=1)
             with patch.object(sys,'argv',args),contextlib.redirect_stderr(io.StringIO()),self.assertRaises(SystemExit):app.main()
 

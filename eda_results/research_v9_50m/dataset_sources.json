@@ -1,0 +1,51 @@
+[
+  {
+    "file": "likes.parquet",
+    "repo_path": "flat/50m/likes.parquet",
+    "bytes": 7180817,
+    "revision": "dd6f3a19eef5866e346c3270e098baa641a44948",
+    "etag": "694087077dbacfcc1d22a5ca85cc6bd8ab182361933406e60500624c6a422bc4"
+  },
+  {
+    "file": "listens.parquet",
+    "repo_path": "flat/50m/listens.parquet",
+    "bytes": 369110332,
+    "revision": "dd6f3a19eef5866e346c3270e098baa641a44948",
+    "etag": "eed9cbd094af1e189507d2f8132a0dc9653b90e65480125c7cdccd601e0592d1"
+  },
+  {
+    "file": "dislikes.parquet",
+    "repo_path": "flat/50m/dislikes.parquet",
+    "bytes": 990007,
+    "revision": "dd6f3a19eef5866e346c3270e098baa641a44948",
+    "etag": "64f240a6d62b8acdfa6efae660a54d10ebc64f9f2f0aeeef8e6bb0dbe7dc2802"
+  },
+  {
+    "file": "unlikes.parquet",
+    "repo_path": "flat/50m/unlikes.parquet",
+    "bytes": 2182377,
+    "revision": "dd6f3a19eef5866e346c3270e098baa641a44948",
+    "etag": "532213992934de765874691ac145324078e61987df26c88e1d671d23f8853180"
+  },
+  {
+    "file": "undislikes.parquet",
+    "repo_path": "flat/50m/undislikes.parquet",
+    "bytes": 180725,
+    "revision": "dd6f3a19eef5866e346c3270e098baa641a44948",
+    "etag": "8cdbcf6e7e79491d560637057ba8ac078dd1610a3fab15442b6f12e45069ef85"
+  },
+  {
+    "file": "artist_item_mapping.parquet",
+    "repo_path": "artist_item_mapping.parquet",
+    "bytes": 38274621,
+    "revision": "dd6f3a19eef5866e346c3270e098baa641a44948",
+    "etag": "cf1110aa2413ed70008ec9232d395660b2181ffda731002fb74da54e87b6f25d"
+  },
+  {
+    "file": "album_item_mapping.parquet",
+    "repo_path": "album_item_mapping.parquet",
+    "bytes": 54528894,
+    "revision": "dd6f3a19eef5866e346c3270e098baa641a44948",
+    "etag": "559b6576063d96280414574b32292eee7b47ee0b9f2952cb3ae670a5d19125e4"
+  }
+]

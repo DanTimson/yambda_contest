@@ -1,0 +1,27 @@
+file,rows,columns
+likes.parquet,881456,"uid: uint32
+timestamp: uint32
+item_id: uint32
+is_organic: uint8"
+listens.parquet,46467212,"uid: uint32
+timestamp: uint32
+item_id: uint32
+is_organic: uint8
+played_ratio_pct: uint16
+track_length_seconds: uint32"
+dislikes.parquet,107776,"uid: uint32
+timestamp: uint32
+item_id: uint32
+is_organic: uint8"
+unlikes.parquet,312972,"uid: uint32
+timestamp: uint32
+item_id: uint32
+is_organic: uint8"
+undislikes.parquet,21033,"uid: uint32
+timestamp: uint32
+item_id: uint32
+is_organic: uint8"
+artist_item_mapping.parquet,9271906,"artist_id: uint32
+item_id: uint32"
+album_item_mapping.parquet,9651644,"album_id: uint32
+item_id: uint32"

@@ -94,9 +94,10 @@ def extract_cache(path, users, lo, hi, cache_dir, seed, permille, batch_size=262
     return dest, info
 
 
-def pair_stats(events, cut, lookback):
+def pair_stats(events, cut, lookback, users=None):
     q = pl.scan_parquet(events).filter(pl.col('cohort') & (pl.col('timestamp') < cut) &
                                      (pl.col('timestamp') >= cut-lookback*DAY))
+    if users is not None: q = q.filter(pl.col('uid').is_in(users))
     return base.collect(q.group_by(KEYS).agg(
         pl.len().alias('plays'), pl.col('timestamp').max().alias('last_ts'),
         (pl.col('played_ratio_pct') > 50).sum().alias('qualified'),
@@ -265,19 +266,26 @@ def main():
     p.add_argument('--lookback-days', type=int, default=90); p.add_argument('--budget', type=int, default=1000)
     p.add_argument('--population-permille', type=int, default=10); p.add_argument('--min-listeners', type=int, default=10)
     p.add_argument('--artist-catalog', type=int, default=200000); p.add_argument('--baseline-run')
+    p.add_argument('--baseline-source-order', choices=['hierarchical', 'ranker'], default='hierarchical')
+    p.add_argument('--listen-cache-bundle', help='Verified portable 5B-derived subset; no full listens file required')
     a = p.parse_args()
     if a.seed < 0 or a.budget < 100 or a.lookback_days < 14 or not 1 <= a.population_permille <= 1000 or min(a.future_days) <= 0 or a.min_listeners < 1:
         p.error('Require seed>=0, budget>=100, lookback>=14, sample permille in [1,1000], positive horizons/support')
     out = Path(a.out)
     if out.exists() and any(out.iterdir()): p.error('Choose a new empty output directory')
-    for name in ['likes', 'listens', 'dislikes', 'unlikes', 'undislikes']:
+    for name in ['likes', 'dislikes', 'unlikes', 'undislikes'] + ([] if a.listen_cache_bundle else ['listens']):
         if not (Path(a.data)/(name+'.parquet')).exists(): p.error(f'Missing {name}.parquet')
     started = time.perf_counter(); ctx = core.load_context(a.data, a.users, a.max_users, a.seed)
     cuts = sorted(set(ctx.end-d*DAY for d in a.future_days))
     if min(cuts) <= ctx.start: p.error('Cutoff must be later than dataset start')
-    events, cache = extract_cache(ctx.data/'listens.parquet', ctx.users,
-                                  min(cuts)-a.lookback_days*DAY, max(cuts),
-                                  a.cache_dir, a.seed, a.population_permille)
+    if a.listen_cache_bundle:
+        from listen_cache_portable import load_bundle
+        events, cache = load_bundle(a.listen_cache_bundle, a.cache_dir, ctx.data, a.users, ctx, cuts,
+                                   a.lookback_days, a.population_permille)
+    else:
+        events, cache = extract_cache(ctx.data/'listens.parquet', ctx.users,
+                                      min(cuts)-a.lookback_days*DAY, max(cuts),
+                                      a.cache_dir, a.seed, a.population_permille)
     r = core.new_report(out)
     r.prose('Questions for this experiment', 'Can prior listening retrieve likes missing from the current likes-only candidates? '
             'Do distinct-listener and organic trends help? Which apparent negatives later become positives? '
@@ -298,7 +306,7 @@ def main():
         history, target = core.history_targets(ctx, cut)
         truth = base.user_lists(target)
         complete = set(target.group_by('uid').len().filter(pl.col('len') == 100)['uid'].to_list())
-        pairs = pair_stats(events, cut, a.lookback_days)
+        pairs = pair_stats(events, cut, a.lookback_days, ctx.users)
         feedback = feedback_pairs(ctx.data, ctx.users, cut, history)
         ll = listen_lists(pairs, cut, a.budget)
         trends, tl = trend_lists(events, cut, a.budget, a.min_listeners)
@@ -306,7 +314,13 @@ def main():
         # Global likes controls reuse existing past-only statistics caches.
         stats, _ = old.cached_stats(ctx.data, cut, a.cache_dir)
         gl = old.global_lists(stats, a.budget, 10)
-        if prior is None:
+        if prior is None and a.baseline_source_order == 'ranker':
+            from train_listen_ranker import LikeFeatures
+            factory = LikeFeatures(ctx, cut, ctx.users, a.cache_dir, a.artist_catalog)
+            prior = {u: factory.user_sources(u)[2][:a.budget] for u in ctx.users}
+            del factory
+            baseline_kind = 'recomputed_candidate_rank_order'
+        elif prior is None:
             artists = old.ArtistSource(ctx.data, history, stats, cut, a.artist_catalog)
             prior = {}
             global_family = core.fuse(list(gl.values()), a.budget)
